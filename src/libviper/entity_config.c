@@ -71,13 +71,14 @@ int configure_wpf(struct viper_entity *entity, void *args)
 	sfmt.pad = 0;
 	sfmt.format.width = wpf_conf->width;
 	sfmt.format.height = wpf_conf->height;
-	sfmt.format.code = wpf_conf->code;
+	sfmt.format.code = wpf_conf->in_code;
 	sfmt.format.field = V4L2_FIELD_NONE;
 	sfmt.format.colorspace = V4L2_COLORSPACE_SRGB;
 	if (ioctl (entity->fd, VIDIOC_SUBDEV_S_FMT, &sfmt))
 		return -1;
 
 	sfmt.pad = 1;
+	sfmt.format.code = wpf_conf->out_code;
 	if (ioctl (entity->fd, VIDIOC_SUBDEV_S_FMT, &sfmt))
 		return -1;
 
@@ -85,7 +86,7 @@ int configure_wpf(struct viper_entity *entity, void *args)
 	fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
 	fmt.fmt.pix_mp.width = wpf_conf->width;
 	fmt.fmt.pix_mp.height = wpf_conf->height;
-	fmt.fmt.pix_mp.pixelformat = wpf_conf->format;
+	fmt.fmt.pix_mp.pixelformat = wpf_conf->out_format;
 	fmt.fmt.pix_mp.field = V4L2_FIELD_NONE;
 
 	return ioctl (entity->io_entity->fd, VIDIOC_S_FMT, &fmt);

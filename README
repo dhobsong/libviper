@@ -1,0 +1,83 @@
+libviper
+===========
+
+libviper: A library for controlling the image processing IP on Renesas devices.
+	  libviper is the Video and Image Processing Engine for Renesas (VIPER).
+	  libviper is a user-space library designed to make accessing and
+	  controlling the V4L2 drivers for Renesas IP easier.  It does NOT
+	  directly control the hardware, and as such a functioning V4L2 driver
+	  for the corresponding image processing IP is necessary to use
+	  libviper.
+
+Copyright (C) 2014 IGEL Co., Ltd.
+
+This source archive contains:
+
+ * src/libviper: the libviper shared library
+ * src/tools: commandline tools
+ * include/shvio: backwards compatible headers for libshvio
+
+libshvio compatibility
+----------------------
+
+libviper supports a backwards compatibility mode that will allow for using
+some of the funtionality of libshvio from within libviper.  This allows
+the VIO hardware to be used from multiple processes simultaneously.  libviper
+operates on virtual addresses, and so has the following differences from
+libshvio:
+	* All virtual addresses passed to libviper must be actual virtual
+	  addresses, capable of being derefernced by the CPU
+        * shvio_set_dst_phys/shvio_set_src_phys are not supported.
+
+If the above limitations are met, libviper should be a drop-in replacement
+for libshvio.
+
+libshvio API
+------------
+
+libshvio provides simple scale and rotate capability via the shvio_resize and
+shvio_rotate blocking functions.
+	vio = shvio_open()
+	do {
+		shvio_resize(vio, ...);
+	} while (processing);
+	shvio_close(vio);
+
+For more flexibility, such as operating on a selection of a larger frame the
+shvio_setup function can be used along with shvio_start and shvio_wait.
+	vio = shvio_open()
+	do {
+		shvio_setup(vio, ...);
+		shvio_start(vio);
+		shvio_wait(vio);
+	} while (processing);
+	shvio_close(vio);
+
+For low latency and reduced memory use, bundle mode is supported via the
+shvio_start_bundle function. Using this mode requires that the input and output
+buffer addresses are updated before the start of the next bundle.
+	vio = shvio_open()
+	do {
+		shvio_setup(vio, ...);
+		do {
+			shvio_set_src(vio, ...);
+			shvio_set_dst(vio, ...);
+			shvio_start_bundle(vio, ...);
+			end = shvio_wait(vio);
+		} while (!end);
+	} while (processing);
+	shvio_close(vio);
+
+Please see doc/libshvio/html/index.html for API details.
+
+Test programs
+-------------
+
+Several test programs are available in the src/tools directory. Currently,
+all of these tools use the libshvio API.  libviper API tools will be coming
+in time.
+
+License
+-------
+
+See the file COPYING for details.

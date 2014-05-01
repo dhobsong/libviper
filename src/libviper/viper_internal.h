@@ -22,8 +22,8 @@
  * THE SOFTWARE.
  */
 
-#ifndef VIP_INTERNAL_H
-#define VIP_INTERNAL_H
+#ifndef VIPER_INTERNAL_H
+#define VIPER_INTERNAL_H
 
 #include <pthread.h>
 #include <stdint.h>
@@ -33,9 +33,12 @@
 #include <linux/v4l2-subdev.h>
 #include <linux/v4l2-mediabus.h>
 
-#define VIP_CAPS_INPUT 		0x1
-#define VIP_CAPS_OUTPUT 	0x2
-#define VIP_CAPS_RESIZE 	0x4
+#define VIPER_CAPS_INPUT 		0x1
+#define VIPER_CAPS_OUTPUT 	0x2
+#define VIPER_CAPS_RESIZE 	0x4
+
+
+#define MAX_SUBPIPES 4
 
 struct viper_entity;
 
@@ -71,12 +74,51 @@ struct viper_device {
 	int media_fd;
 	struct viper_entity *entity_list;
 	struct viper_io_entity *io_entity_list;
+	int active_subpipe;
+	struct viper_entity *subpipe_final[MAX_SUBPIPES];
+//	struct viper_entity *locked_entities;
 	struct viper_device *next;
 };
 
 struct viper_context {
 	struct viper_device *device_list;
-	struct viper_entity *locked_entities;
-	bool pipeline_complete;
+	pthread_mutex_t	lock;
+	int ref_cnt;
 };
+
+#define MAX_INPUT_BUFFERS 4
+#define MAX_OUTPUT_BUFFERS 4
+#define MAX_PLANES 2
+
+struct viper_pipeline {
+	int	num_inputs;
+	int	num_outputs;
+	struct viper_entity *locked_entities;
+
+	int	input_fds[MAX_INPUT_BUFFERS];
+	void	*input_addr[MAX_INPUT_BUFFERS][MAX_PLANES];
+	int	input_size[MAX_INPUT_BUFFERS][MAX_PLANES];
+	int	input_planes[MAX_INPUT_BUFFERS];
+
+	int	output_fds[MAX_OUTPUT_BUFFERS];
+	void	*output_addr[MAX_OUTPUT_BUFFERS][MAX_PLANES];
+	int	output_size[MAX_OUTPUT_BUFFERS][MAX_PLANES];
+	int	output_planes[MAX_OUTPUT_BUFFERS];
+};
+
+struct viper_pipeline * create_pipeline(struct viper_device *dev,
+		int *caps_list, void **args_list, int length);
+
+int queue_buffer(int fd, void **buffer, int *size, int count, bool input);
+
+static enum v4l2_mbus_pixelcode color_fmt_to_code(uint32_t format) {
+	switch (format) {
+	case V4L2_PIX_FMT_YUV420M:
+	case V4L2_PIX_FMT_NV12M:
+	case V4L2_PIX_FMT_UYVY:
+		return V4L2_MBUS_FMT_AYUV8_1X32;
+	default:
+		return V4L2_MBUS_FMT_ARGB8888_1X32;
+	}
+}
 #endif

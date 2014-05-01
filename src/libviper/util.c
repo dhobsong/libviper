@@ -43,17 +43,12 @@
 #define DEBUG
 
 UIOMux *uiomux;
+struct viper_context viper = {
+	.lock = PTHREAD_MUTEX_INITIALIZER,
+	.ref_cnt = 0,
+	.device_list = NULL,
+};
 
-static enum v4l2_mbus_pixelcode color_fmt_to_code(uint32_t format) {
-	switch (format) {
-	case V4L2_PIX_FMT_YUV420M:
-	case V4L2_PIX_FMT_NV12M:
-	case V4L2_PIX_FMT_UYVY:
-		return V4L2_MBUS_FMT_AYUV8_1X32;
-	default:
-		return V4L2_MBUS_FMT_ARGB8888_1X32;
-	}
-}
 
 static int fgets_with_openclose(char *fname, char *buf, size_t maxlen)
 {
@@ -72,17 +67,17 @@ static int fgets_with_openclose(char *fname, char *buf, size_t maxlen)
 const struct entity_capability entity_cap_list[] = {
 	{
 		.name = "rpf",
-		.caps = VIP_CAPS_INPUT,
+		.caps = VIPER_CAPS_INPUT,
 		.config = configure_rpf,
 	},
 	{
 		.name = "wpf",
-		.caps = VIP_CAPS_OUTPUT,
+		.caps = VIPER_CAPS_OUTPUT,
 		.config = configure_wpf,
 	},
 	{
 		.name = "uds",
-		.caps = VIP_CAPS_RESIZE,
+		.caps = VIPER_CAPS_RESIZE,
 		.config = configure_uds,
 	},
 };
@@ -274,11 +269,20 @@ int enum_media_entities(struct viper_context *viper)
 			return -1;
 		dev = dev->next;
 	}
+	return 0;
 }
-int init_context (struct viper_context *viper) {
-	find_entities(viper, "/sys/class/video4linux/video%d/name", true);
-	find_entities(viper, "/sys/class/video4linux/v4l-subdev%d/name", false);
-	enum_media_entities(viper);
+int init_context () {
+	pthread_mutex_lock(&viper.lock);
+	if (viper.ref_cnt++) {
+		pthread_mutex_unlock(&viper.lock);
+		return 0;
+	}
+
+	find_entities(&viper, "/sys/class/video4linux/video%d/name", true);
+	find_entities(&viper, "/sys/class/video4linux/v4l-subdev%d/name", false);
+	enum_media_entities(&viper);
+
+	pthread_mutex_unlock(&viper.lock);
 	return 0;
 }
 /*  ----------------------------------------------- */
@@ -329,12 +333,17 @@ done:
 	return ret;
 }
 
-static int enable_link(struct viper_device *dev,
-		struct viper_entity *from,
-		struct viper_entity *to)
+static int enable_links(struct viper_device *dev,
+		struct viper_entity *to,
+		int num_suppipes)
 {
 	int ret, i;
+	struct viper_entity *from;
 	struct media_links_enum links;
+
+	from = dev->subpipe_final[dev->active_subpipe];
+	if (!from)
+		goto no_link;
 
 	memset(&links, 0, sizeof (struct media_links_enum));
 	links.entity = from->media_id;
@@ -343,7 +352,7 @@ static int enable_link(struct viper_device *dev,
 
 	ret = ioctl(dev->media_fd, MEDIA_IOC_ENUM_LINKS, &links);
 	if (ret)
-		goto done;
+		goto links_done;
 
 	for (i = 0; i < from->links; i++) {
 		if (links.links[i].sink.entity == to->media_id) {
@@ -357,39 +366,30 @@ static int enable_link(struct viper_device *dev,
 			else if (errno == EBUSY)
 				continue;
 			else
-				goto done;
+				goto links_done;
 		}
 	}
 
-done:
-
+links_done:
 	free(links.links);
+no_link:
+	dev->subpipe_final[dev->active_subpipe] = to;
 	return ret;
 }
 
-static struct viper_entity * get_free_entity(struct viper_context *viper,
- 		   	            struct viper_device *device,
+static struct viper_entity * get_free_entity(struct viper_device *dev,
+				    struct viper_pipeline *pipe,
 		  		    int caps)
 {
-	struct viper_device *dev = viper->device_list;
 	struct viper_entity *entity;
-	while (dev) {
-		if (!device) {
-			/* need to seach for appropriate device */
-			break;
-		}
-		if (device && dev == device)
-			break;
-		dev = dev->next;
-	}
 
 	entity = dev->entity_list;
 	while (entity) {
 		if (entity->caps->caps & caps) {
 			if (!try_entity_lock(entity)) {
-				entity->next_locked = viper->locked_entities;
-				viper->locked_entities = entity;
+				entity->next_locked = pipe->locked_entities;
 				disable_links(dev, entity);
+				pipe->locked_entities = entity;
 				return entity;
 			}
 		}
@@ -398,141 +398,198 @@ static struct viper_entity * get_free_entity(struct viper_context *viper,
 	return NULL;
 }
 
-void free_pipeline(struct viper_context *viper)
+void free_pipeline(struct viper_device *dev, struct viper_pipeline *pipe)
 {
-	struct viper_entity *entity = viper->locked_entities;
+	struct viper_entity *entity = pipe->locked_entities;
 	while (entity) {
 		entity_unlock(entity);
-		entity = entity->next;
+		disable_links(dev, entity);
+		entity = entity->next_locked;
 	}
 	
-} 
+}
+
+struct viper_pipeline * create_pipeline(struct viper_device *dev,
+		int *caps_list, void **args_list, int length) {
+#if 0
+		struct viper_pipeline *pipeline, int length,
+		int *in_fd, int *out_fd) {
+#endif
+	int i;
+	struct viper_entity *entity;
+	struct viper_pipeline *pipe;
+	
+	/* need to seach for appropriate device */
+	pipe = calloc(1, sizeof(struct viper_pipeline));
+
+	for (i = 0; i < length; i++) {
+		entity = get_free_entity(dev, pipe, caps_list[i]);
+		if (!entity || entity->caps->config(entity, args_list[i]))
+			goto error_out;
+		if (caps_list[i] & VIPER_CAPS_INPUT)
+			pipe->input_fds[pipe->num_inputs++] = 
+				entity->io_entity->fd;
+		if (caps_list[i] & VIPER_CAPS_OUTPUT)
+			pipe->output_fds[pipe->num_outputs++] = 
+				entity->io_entity->fd;
+		if (enable_links(dev, entity, 1))
+			goto error_out;
+	}
+
+	return pipe;
+
+error_out:
+	free_pipeline(dev, pipe);
+	return NULL;
+}
+
+int stop_io_device(int fd, bool input) {
+	struct v4l2_requestbuffers reqbuf;
+	enum v4l2_buf_type buftype;
+	if (input)
+		buftype = V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
+	else
+		buftype = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
+
+	ioctl(fd, VIDIOC_STREAMOFF, &buftype);
+
+	reqbuf.count = 0;
+	reqbuf.type = buftype;
+	reqbuf.memory = V4L2_MEMORY_USERPTR;
+	if(ioctl(fd, VIDIOC_REQBUFS, &reqbuf)) {
+		printf("reqbufs 0 failed for %s stream on %d - %d\n",
+			input ? "input" : "output", fd, errno);
+		return -1;
+	}
+	return 0;
+}
+
+int start_io_device(int fd, bool input) {
+	struct v4l2_requestbuffers reqbuf;
+	enum v4l2_buf_type buftype;
+	memset(&reqbuf, 0, sizeof(reqbuf));
+
+	if (input)
+		buftype = V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
+	else
+		buftype = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
+
+	reqbuf.count = 1;
+	reqbuf.type = buftype;
+	reqbuf.memory = V4L2_MEMORY_USERPTR;
 
 
+	if(ioctl(fd, VIDIOC_REQBUFS, &reqbuf)) {
+		printf("reqbufs failed for %s stream on %d - %d\n",
+			input ? "input" : "output", fd, errno);
+		return -1;
+	}
+
+	if(ioctl(fd, VIDIOC_STREAMON, &buftype)) {
+		printf("stream on failed for %s stream on %d - %d\n",
+			input ? "input" : "output", fd, errno);
+		return -1;
+	}
+	return 0;
+}
+
+int dequeue_buffer(int fd, bool input)
+{
+	struct v4l2_buffer buf;
+	enum v4l2_buf_type buftype;
+
+	if (input)
+		buftype = V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
+	else
+		buftype = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
+
+	memset(&buf, 0, sizeof(buf));
+	buf.type = buftype;
+	buf.memory = V4L2_MEMORY_USERPTR;
+	return ioctl(fd, VIDIOC_DQBUF, &buf);
+}
+
+int queue_buffer(int fd, void **buffer, int *size, int count, bool input)
+{
+	struct v4l2_buffer buf;
+	struct v4l2_plane *planes;
+	enum v4l2_buf_type buftype;
+	int ret, i;
+
+	if (input)
+		buftype = V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
+	else
+		buftype = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
+
+	planes = calloc(count, sizeof(struct v4l2_plane));
+
+	memset(&buf, 0, sizeof(buf));
+	buf.type = buftype;
+	buf.index = 0;
+	buf.bytesused = size;
+	buf.field = V4L2_FIELD_NONE;
+	buf.memory = V4L2_MEMORY_USERPTR;
+	buf.m.planes = planes;
+	buf.length = count;
+
+
+	for (i = 0; i < count; i++) {
+		planes[i].length = size[i];
+		planes[i].m.userptr = (unsigned long) buffer[i];
+		if (input)
+			planes[i].bytesused = size[i];
+	}
+
+	ret =  ioctl(fd, VIDIOC_QBUF, &buf);
+	free(planes);
+	return ret;
+}
+#if 0
 int resize_pipeline(struct viper_context *viper) {
 	struct viper_device *dev = viper->device_list;
-	struct viper_entity *rpf_entity;
-	struct viper_entity *uds_entity;
-	struct viper_entity *wpf_entity;
 
 	struct viper_rpf_config rpf_set;
 	struct viper_wpf_config wpf_set;
 	struct viper_uds_config uds_set;
+	struct viper_pipeline *pipeline;
 	
 	enum v4l2_buf_type buftype;
 	void *tmpbuf;
+	int caps[3];
+	void *args[3];
 
 	int code = color_fmt_to_code(V4L2_PIX_FMT_RGB24);
 
 	rpf_set.width = uds_set.in_width = 100;
 	rpf_set.height = uds_set.in_height = 100;
 
-	wpf_set.width = uds_set.out_width = 200;
-	wpf_set.height = uds_set.out_height = 200;
+	wpf_set.width = uds_set.out_width = 100;
+	wpf_set.height = uds_set.out_height = 100;
 
 	rpf_set.code = wpf_set.code = uds_set.code = code;
 	rpf_set.format = wpf_set.format = V4L2_PIX_FMT_RGB24;
+	
+	caps[0] = VIPER_CAPS_INPUT;
+	caps[1] = VIPER_CAPS_RESIZE;
+	caps[2] = VIPER_CAPS_OUTPUT;
 
+	args[0] = &rpf_set;
+	args[1] = &uds_set;
+	args[2] = &wpf_set;
 
-	rpf_entity = get_free_entity(viper, NULL, VIP_CAPS_INPUT);
-	if (!rpf_entity || rpf_entity->caps->config(rpf_entity, &rpf_set))
-		goto error_out;
+	pipeline = create_pipeline(dev, caps, args, 3);
 
-	uds_entity = get_free_entity(viper, NULL, VIP_CAPS_RESIZE);
-	if (!uds_entity || uds_entity->caps->config(uds_entity, &uds_set))
-		goto error_out;
-
-	if (enable_link(dev, rpf_entity, uds_entity))
-		goto error_out;
-
-	wpf_entity = get_free_entity(viper, NULL, VIP_CAPS_OUTPUT);
-	if (!wpf_entity || wpf_entity->caps->config(wpf_entity, &wpf_set))
-		goto error_out;
-
-	if (enable_link(dev, uds_entity, wpf_entity))
-		goto error_out;
+	start_io_device(pipeline->input_fds[0], true);
+	start_io_device(pipeline->output_fds[0], false);
 
 	tmpbuf = uiomux_malloc(uiomux, 1, 1024*1024, 1);
+/*	queue_buffer(pipeline->input_fds[0], tmpbuf, 40000, true);
+	queue_buffer(pipeline->input_fds[1], tmpbuf + 40000, 40000, false);*/
 
-	buftype = V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
-	{
-		struct v4l2_requestbuffers reqbuf;
-		memset(&reqbuf, 0, sizeof(reqbuf));
-		reqbuf.count = 1;
-		reqbuf.type = buftype;
-		reqbuf.memory = V4L2_MEMORY_USERPTR;
-
-		if(ioctl(rpf_entity->io_entity->fd, VIDIOC_REQBUFS, &reqbuf))
-			return -1;
-	}
-	{
-		struct v4l2_buffer buf;
-		struct v4l2_plane plane;
-		memset(&buf, 0, sizeof(buf));
-		memset(&plane, 0, sizeof(plane));
-		buf.type = buftype;
-		buf.index = 0;
-		buf.bytesused = 40000;
-		buf.field = V4L2_FIELD_NONE;
-		buf.memory = V4L2_MEMORY_USERPTR;
-		buf.m.planes = &plane;
-		buf.length = 1;
-
-		plane.bytesused = 40000;
-		plane.length = 40000;
-		plane.m.userptr = tmpbuf;
-
-		if(ioctl(rpf_entity->io_entity->fd, VIDIOC_QBUF, &buf))
-			return -1;
-	}
-	
-	if (ioctl(rpf_entity->io_entity->fd, VIDIOC_STREAMON, &buftype)) {
-		printf("############rpf Stream on failed %d\n", errno);
-		return -1;
-	}
-	
-	buftype = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
-	{
-		struct v4l2_requestbuffers reqbuf;
-		memset(&reqbuf, 0, sizeof(reqbuf));
-		reqbuf.count = 1;
-		reqbuf.type = buftype;
-		reqbuf.memory = V4L2_MEMORY_USERPTR;
-
-		if(ioctl(wpf_entity->io_entity->fd, VIDIOC_REQBUFS, &reqbuf))
-			return -1;
-	}
-	{
-		struct v4l2_buffer buf;
-		struct v4l2_plane plane;
-		memset(&plane, 0, sizeof(plane));
-		memset(&buf, 0, sizeof(buf));
-		buf.type = buftype;
-		buf.index = 0;
-		buf.memory = V4L2_MEMORY_USERPTR;
-		buf.field = V4L2_FIELD_NONE;
-		buf.m.planes = &plane;
-		buf.length = 1;
-
-		plane.length = 160000;
-		plane.m.userptr = tmpbuf + 50000;
-		if(ioctl(wpf_entity->io_entity->fd, VIDIOC_QBUF, &buf))
-			return -1;
-	}
-	
-	if(ioctl(wpf_entity->io_entity->fd, VIDIOC_STREAMON, &buftype)) {
-		printf("############wpf Stream on failed %d\n", errno);
-		return -1;
-	}
-	
 	printf("All good\n");
 	return 0;
-
-error_out:
-	free_pipeline(viper);
-	return -1;
 }
-
+#endif
 const char *names[] = {
 	"VPU",
 	NULL,
@@ -586,14 +643,40 @@ void dump_links(struct viper_device *dev,
 	printf("Cannot find media id for %s\n", io_entity->name);
 }
 #endif
+#if 0
+#include <shvio/shvio.h>
 
 main () {
 	struct viper_io_entity *io_entity;
-	struct viper_context viper;
+	SHVIO *shvio;
+	struct ren_vid_surface src, dst;
+	char *tmpbuf;
 	uiomux = uiomux_open_named(names);
+#if 0
 	memset(&viper, 0, sizeof(struct viper_context));
-	init_context(&viper);
+	init_context();
 	resize_pipeline(&viper);
+#else
+	shvio = shvio_open();
+	memset(&src, 0, sizeof(src));
+	memset(&dst, 0, sizeof(dst));
+	tmpbuf = uiomux_malloc(uiomux, 1, 1024*1024, 1);
+	src.format = REN_BGR32;
+	src.w = 100;
+	src.h = 100;
+	src.pitch = 100;
+	src.py = tmpbuf;
+
+	dst.format = REN_BGR32;
+	dst.w = 100;
+	dst.h = 100;
+	dst.pitch = 100;
+	dst.py = tmpbuf + 40000;
+
+	shvio_setup(shvio, &src, &dst, 0);
+	shvio_start(shvio);
+	shvio_wait(shvio);
+#endif 
 #ifdef DEBUG
 	io_entity = viper.device_list->io_entity_list;	
 	while(io_entity) {
@@ -603,9 +686,9 @@ main () {
 		
 	
 #endif
-	
 
 	
 }
 
+#endif
 

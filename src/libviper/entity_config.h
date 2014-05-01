@@ -35,8 +35,10 @@ int configure_rpf(struct viper_entity *entity, void *args);
 struct viper_wpf_config {
 	int width;
 	int height;
-	uint32_t format;
-	enum v4l2_mbus_pixelcode code;
+	uint32_t in_format;
+	enum v4l2_mbus_pixelcode in_code;
+	uint32_t out_format;
+	enum v4l2_mbus_pixelcode out_code;
 };
 int configure_wpf(struct viper_entity *entity, void *args);
 
