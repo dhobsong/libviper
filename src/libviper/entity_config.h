@@ -27,6 +27,10 @@
 struct viper_rpf_config {
 	int width;
 	int height;
+	int bpitch0;
+	int bpitch1;
+	int bpitch2;
+	int planes;
 	uint32_t format;
 	enum v4l2_mbus_pixelcode code;
 };
@@ -35,6 +39,10 @@ int configure_rpf(struct viper_entity *entity, void *args);
 struct viper_wpf_config {
 	int width;
 	int height;
+	int bpitch0;
+	int bpitch1;
+	int bpitch2;
+	int planes;
 	uint32_t in_format;
 	enum v4l2_mbus_pixelcode in_code;
 	uint32_t out_format;

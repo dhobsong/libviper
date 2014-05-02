@@ -55,6 +55,9 @@ int configure_rpf(struct viper_entity *entity, void *args)
 	fmt.fmt.pix_mp.height = rpf_conf->height;
 	fmt.fmt.pix_mp.pixelformat = rpf_conf->format;
 	fmt.fmt.pix_mp.field = V4L2_FIELD_NONE;
+	fmt.fmt.pix_mp.plane_fmt[0].bytesperline = rpf_conf->bpitch0;
+	fmt.fmt.pix_mp.plane_fmt[1].bytesperline = rpf_conf->bpitch1;
+	fmt.fmt.pix_mp.num_planes = rpf_conf->planes;
 
 	return ioctl (entity->io_entity->fd, VIDIOC_S_FMT, &fmt);
 }
@@ -88,6 +91,9 @@ int configure_wpf(struct viper_entity *entity, void *args)
 	fmt.fmt.pix_mp.height = wpf_conf->height;
 	fmt.fmt.pix_mp.pixelformat = wpf_conf->out_format;
 	fmt.fmt.pix_mp.field = V4L2_FIELD_NONE;
+	fmt.fmt.pix_mp.plane_fmt[0].bytesperline = wpf_conf->bpitch0;
+	fmt.fmt.pix_mp.plane_fmt[1].bytesperline = wpf_conf->bpitch1;
+	fmt.fmt.pix_mp.num_planes = wpf_conf->planes;
 
 	return ioctl (entity->io_entity->fd, VIDIOC_S_FMT, &fmt);
 }
