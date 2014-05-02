@@ -115,6 +115,7 @@ static enum v4l2_mbus_pixelcode color_fmt_to_code(uint32_t format) {
 	switch (format) {
 	case V4L2_PIX_FMT_YUV420M:
 	case V4L2_PIX_FMT_NV12M:
+	case V4L2_PIX_FMT_NV16M:
 	case V4L2_PIX_FMT_UYVY:
 		return V4L2_MBUS_FMT_AYUV8_1X32;
 	default:
