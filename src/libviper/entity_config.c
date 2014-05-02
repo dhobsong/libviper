@@ -120,8 +120,7 @@ int configure_uds(struct viper_entity *entity, void *args)
 	sfmt.pad = 1;
 	sfmt.format.width = uds_conf->out_width;
 	sfmt.format.height = uds_conf->out_height;
-	if (ioctl (entity->fd, VIDIOC_SUBDEV_S_FMT, &sfmt))
-		return -1;
+	return ioctl (entity->fd, VIDIOC_SUBDEV_S_FMT, &sfmt);
 }
 
 
