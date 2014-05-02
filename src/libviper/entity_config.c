@@ -24,6 +24,7 @@
 #include <string.h>
 #include <linux/videodev2.h>
 #include <linux/v4l2-subdev.h>
+#include <sys/ioctl.h>
 #include "entity_config.h"
 #include "viper_internal.h"
 
