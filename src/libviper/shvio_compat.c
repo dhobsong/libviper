@@ -237,12 +237,12 @@ int shvio_setup(SHVIO *vio,
 	}
 	pipeline->input_addr[0][0] = src_surface->py;
 	pipeline->input_size[0][0] = src_surface->h *
-		size_y(src_surface->format, src_surface->w, 0);
+		size_y(src_surface->format, src_surface->pitch, 0);
 
 	if (input_planes > 1) {
 		pipeline->input_addr[0][1] = src_surface->pc;
 		pipeline->input_size[0][1] = src_surface->h *
-			size_c(src_surface->format, src_surface->w, 0);
+			size_c(src_surface->format, src_surface->pitch, 0);
 	}
 
 	pipeline->output_planes[0] = output_planes;
@@ -254,12 +254,12 @@ int shvio_setup(SHVIO *vio,
 
 	pipeline->output_addr[0][0] = dst_surface->py;
 	pipeline->output_size[0][0] = dst_surface->h *
-		size_y(dst_surface->format, dst_surface->w, 0);
+		size_y(dst_surface->format, dst_surface->pitch, 0);
 
 	if (output_planes > 1) {
 		pipeline->input_addr[0][1] = dst_surface->pc;
 		pipeline->input_size[0][1] = dst_surface->h *
-			size_c(dst_surface->format, dst_surface->w, 0);
+			size_c(dst_surface->format, dst_surface->pitch, 0);
 	}
 	vio->bundle_lines_remaining = src_surface->h;
 	vio->bundle_lines = vio->bundle_lines_remaining;
