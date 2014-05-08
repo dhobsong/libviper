@@ -122,4 +122,5 @@ static enum v4l2_mbus_pixelcode color_fmt_to_code(uint32_t format) {
 		return V4L2_MBUS_FMT_ARGB8888_1X32;
 	}
 }
+int init_context ();
 #endif

@@ -262,6 +262,7 @@ int enum_device_entities(struct viper_device *dev) {
 		memset(&media_ent, 0, sizeof(struct media_entity_desc));
 		media_ent.id = last_id | MEDIA_ENT_ID_FLAG_NEXT;
 	}
+	return 0;
 }
 
 int enum_media_entities(struct viper_context *viper)
