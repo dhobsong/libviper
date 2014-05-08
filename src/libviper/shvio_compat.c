@@ -183,7 +183,7 @@ int shvio_setup(SHVIO *vio,
 	vio->rpf_set.width = src_surface->w;
 	vio->rpf_set.height = src_surface->h;
 	vio->rpf_set.bpitch0 = size_y(fmt->format, src_surface->pitch, src_surface->bpitchy);
-	vio->rpf_set.bpitch1 = size_c(fmt->format, src_surface->pitch, src_surface->bpitchc);
+	vio->rpf_set.bpitch1 = size_y(fmt->format, src_surface->pitch, src_surface->bpitchc);
 	vio->rpf_set.planes = input_planes;
 	vio->rpf_set.format = fmt->v4l_format;
 	vio->rpf_set.code = color_fmt_to_code(fmt->v4l_format);
