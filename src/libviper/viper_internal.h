@@ -45,7 +45,7 @@ struct viper_entity;
 struct entity_capability {
 	char 		name[255];
 	bool		io_entity;
-	uint32_t 	caps;
+	unsigned int 	caps;
 	int (*config) (struct viper_entity *entity, void *args);
 };
 
@@ -63,7 +63,7 @@ struct viper_entity {
 	int links;
 	pthread_mutex_t	lock;
 	int fd;
-	int media_id;
+	unsigned int media_id;
 	struct viper_io_entity *io_entity;
 	struct viper_entity *next;
 	struct viper_entity *next_locked;

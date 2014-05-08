@@ -310,7 +310,7 @@ void shvio_start(SHVIO *vio)
 }
 
 static int reconfig_pipeline(struct viper_pipeline *pipe,
-			     int *caps,
+			     unsigned int *caps,
 			     void **args,
 			     int count)
 {

@@ -346,8 +346,10 @@ static int enable_links(struct viper_device *dev,
 	struct media_links_enum links;
 
 	from = dev->subpipe_final[dev->active_subpipe];
-	if (!from)
+	if (!from) {
+		ret = 0;
 		goto no_link;
+	}
 
 	memset(&links, 0, sizeof (struct media_links_enum));
 	links.entity = from->media_id;
@@ -536,7 +538,6 @@ int queue_buffer(int fd, void **buffer, int *size, int count, bool input)
 	memset(&buf, 0, sizeof(buf));
 	buf.type = buftype;
 	buf.index = 0;
-	buf.bytesused = size;
 	buf.field = V4L2_FIELD_NONE;
 	buf.memory = V4L2_MEMORY_USERPTR;
 	buf.m.planes = planes;
