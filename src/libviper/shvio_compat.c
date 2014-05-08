@@ -23,6 +23,8 @@
  */
 
 #include "entity_config.h"
+#include <errno.h>
+#include "log.h"
 #include <poll.h>
 #include <shvio/shvio.h>
 #include <string.h>
@@ -97,8 +99,12 @@ SHVIO *shvio_open_named(const char *name) {
 	init_context();
 	struct viper_device *device = viper.device_list;
 	struct SHVIO *vio;
-	if (!device)
+
+
+	if (!device) {
+		viper_log("no device");
 		return NULL;
+	}
 
 	if (!name) {
 		vio = calloc(1, sizeof(struct SHVIO));
@@ -218,13 +224,17 @@ int shvio_setup(SHVIO *vio,
 
 	pipeline = create_pipeline(device, caps, args, num_ents);
 
-	if (!pipeline)
+	if (!pipeline) {
+		viper_log("%s: pipeline config failed\n", __FUNCTION__);
 		return -1;
+	}
 
 	pipeline->input_planes[0] = input_planes;
 
-	if (start_io_device(pipeline->input_fds[0], true))
+	if (start_io_device(pipeline->input_fds[0], true)) {
+		viper_log("%s: cannot start input device\n", __FUNCTION__);
 		return -1;
+	}
 	pipeline->input_addr[0][0] = src_surface->py;
 	pipeline->input_size[0][0] = src_surface->h *
 		size_y(src_surface->format, src_surface->w, 0);
@@ -237,8 +247,10 @@ int shvio_setup(SHVIO *vio,
 
 	pipeline->output_planes[0] = output_planes;
 
-	if (start_io_device(pipeline->output_fds[0], false))
+	if (start_io_device(pipeline->output_fds[0], false)) {
+		viper_log("%s: cannot start output device\n", __FUNCTION__);
 		return -1;
+	}
 
 	pipeline->output_addr[0][0] = dst_surface->py;
 	pipeline->output_size[0][0] = dst_surface->h *
@@ -262,30 +274,39 @@ int shvio_rotate(SHVIO *vio,
 	shvio_setup(vio,src_surface,dst_surface,rotate);
 	shvio_start(vio);
 	shvio_wait(vio);
+	return 0;
 }
 
 int shvio_resize(SHVIO *vio,
 	const struct ren_vid_surface *src_surface,
         const struct ren_vid_surface *dst_surface) {
-	int i;
 	shvio_setup(vio,src_surface,dst_surface,0);
 	shvio_start(vio);
 	shvio_wait(vio);
+	return 0;
 }
 
 void shvio_start(SHVIO *vio)
 {
 	struct viper_pipeline *pipe = vio->pipeline;
 	int i;
+	int ret;
 
+	ret = 0;
 	for (i = 0; i < pipe->num_inputs; i++) {
-		queue_buffer(pipe->input_fds[i], pipe->input_addr[i],
+		ret |= queue_buffer(pipe->input_fds[i], pipe->input_addr[i],
 			pipe->input_size[i], pipe->input_planes[i], true);
+		if (ret)
+			viper_log("%s: queue input buffer fail. %d\n", errno);
 	}
 
-	for (i = 0; i < pipe->num_outputs; i++)
-		queue_buffer(pipe->output_fds[i], pipe->output_addr[i],
+	ret = 0;
+	for (i = 0; i < pipe->num_outputs; i++) {
+		ret |= queue_buffer(pipe->output_fds[i], pipe->output_addr[i],
 			pipe->output_size[i], pipe->input_planes[i], false);
+		if (ret)
+			viper_log("%s: queue output buffer fail. %d\n", errno);
+	}
 }
 
 static int reconfig_pipeline(struct viper_pipeline *pipe,
@@ -346,11 +367,16 @@ void shvio_start_bundle(SHVIO *vio, int bundle_lines)
 		vio->output_c_offset = vio->wpf_set.bpitch1 * wpf_lines;
 	}
 
-	queue_buffer(pipe->input_fds[0], pipe->input_addr[0],
-		pipe->input_size[0], pipe->input_planes[0], true);
+	if (queue_buffer(pipe->input_fds[0], pipe->input_addr[0],
+			pipe->input_size[0], pipe->input_planes[0], true))
+		viper_log("%s: queue input buffer fail. %d\n", __FUNCTION__,
+			errno);
 
-	queue_buffer(pipe->output_fds[0], pipe->output_addr[0],
-		pipe->output_size[0], pipe->input_planes[0], false);
+	if (queue_buffer(pipe->output_fds[0], pipe->output_addr[0],
+		pipe->output_size[0], pipe->input_planes[0], false))
+		viper_log("%s: queue output buffer fail. %d\n", __FUNCTION__,
+									errno);
+
 	pipe->output_addr[0][0] += vio->output_y_offset;
 	pipe->output_addr[0][1] += vio->output_c_offset;
 }

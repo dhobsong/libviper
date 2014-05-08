@@ -25,6 +25,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include "log.h"
 #include <pthread.h>
 #include <string.h>
 #include <stdlib.h>
@@ -227,11 +228,13 @@ int find_entities(struct viper_context *viper, const char *path_str, bool io_ent
 			if (!device) {
 				device = token;
 			} else {
-				register_entity(viper, device, token, io_entity, i);
+				register_entity(viper, device, token,
+						io_entity, i);
 				break;
 			}
-		} while (token = strtok(NULL, " "));
+		} while ((token = strtok(NULL, " ")));
 	}
+	return 0;
 }
 
 int enum_device_entities(struct viper_device *dev) {
@@ -424,16 +427,22 @@ struct viper_pipeline * create_pipeline(struct viper_device *dev,
 
 	for (i = 0; i < length; i++) {
 		entity = get_free_entity(dev, pipe, caps_list[i]);
-		if (!entity || entity->caps->config(entity, args_list[i]))
+		if (!entity || entity->caps->config(entity, args_list[i])) {
+			viper_log("%s: No free enities for cap type %d",
+				__FUNCTION__, caps_list[i]);
 			goto error_out;
+		}
 		if (caps_list[i] & VIPER_CAPS_INPUT)
 			pipe->input_fds[pipe->num_inputs++] = 
 				entity->io_entity->fd;
 		if (caps_list[i] & VIPER_CAPS_OUTPUT)
 			pipe->output_fds[pipe->num_outputs++] = 
 				entity->io_entity->fd;
-		if (enable_links(dev, entity, 1))
+		if (enable_links(dev, entity, 1)) {
+			viper_log("%s: Entity link failed. caps=%d",
+				__FUNCTION__, caps_list[i]);
 			goto error_out;
+		}
 	}
 
 	return pipe;

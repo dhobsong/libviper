@@ -22,6 +22,7 @@
  * THE SOFTWARE.
  */
 #include <string.h>
+#include "log.h"
 #include <linux/videodev2.h>
 #include <linux/v4l2-subdev.h>
 #include <sys/ioctl.h>
@@ -43,12 +44,18 @@ int configure_rpf(struct viper_entity *entity, void *args)
 	sfmt.format.code = rpf_conf->code;
 	sfmt.format.field = V4L2_FIELD_NONE;
 	sfmt.format.colorspace = V4L2_COLORSPACE_SRGB;
-	if (ioctl (entity->fd, VIDIOC_SUBDEV_S_FMT, &sfmt))
+	if (ioctl (entity->fd, VIDIOC_SUBDEV_S_FMT, &sfmt)) {
+		viper_log("%s: VIDIOC_SUBDEV_S_FMT failed %d\n", __FUNCTION__,
+			sfmt.pad);
 		return -1;
+	}
 
 	sfmt.pad = 1;
-	if (ioctl (entity->fd, VIDIOC_SUBDEV_S_FMT, &sfmt))
+	if (ioctl (entity->fd, VIDIOC_SUBDEV_S_FMT, &sfmt)) {
+		viper_log("%s: VIDIOC_SUBDEV_S_FMT failed %d\n", __FUNCTION__,
+			sfmt.pad);
 		return -1;
+	}
 
 	memset(&fmt, 0, sizeof(struct v4l2_format));
 	fmt.type = V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
@@ -60,7 +67,11 @@ int configure_rpf(struct viper_entity *entity, void *args)
 	fmt.fmt.pix_mp.plane_fmt[1].bytesperline = rpf_conf->bpitch1;
 	fmt.fmt.pix_mp.num_planes = rpf_conf->planes;
 
-	return ioctl (entity->io_entity->fd, VIDIOC_S_FMT, &fmt);
+	if (ioctl (entity->io_entity->fd, VIDIOC_S_FMT, &fmt)) {
+		viper_log("%s: VIDIOC_S_FMT failed %d\n", __FUNCTION__);
+		return -1;
+	}
+	return 0;
 }
 
 
@@ -78,13 +89,19 @@ int configure_wpf(struct viper_entity *entity, void *args)
 	sfmt.format.code = wpf_conf->in_code;
 	sfmt.format.field = V4L2_FIELD_NONE;
 	sfmt.format.colorspace = V4L2_COLORSPACE_SRGB;
-	if (ioctl (entity->fd, VIDIOC_SUBDEV_S_FMT, &sfmt))
+	if (ioctl (entity->fd, VIDIOC_SUBDEV_S_FMT, &sfmt)) {
+		viper_log("%s: VIDIOC_SUBDEV_S_FMT failed %d\n", __FUNCTION__,
+			sfmt.pad);
 		return -1;
+	}
 
 	sfmt.pad = 1;
 	sfmt.format.code = wpf_conf->out_code;
-	if (ioctl (entity->fd, VIDIOC_SUBDEV_S_FMT, &sfmt))
+	if (ioctl (entity->fd, VIDIOC_SUBDEV_S_FMT, &sfmt)) {
+		viper_log("%s: VIDIOC_SUBDEV_S_FMT failed %d\n", __FUNCTION__,
+			sfmt.pad);
 		return -1;
+	}
 
 	memset(&fmt, 0, sizeof(struct v4l2_format));
 	fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
@@ -96,7 +113,11 @@ int configure_wpf(struct viper_entity *entity, void *args)
 	fmt.fmt.pix_mp.plane_fmt[1].bytesperline = wpf_conf->bpitch1;
 	fmt.fmt.pix_mp.num_planes = wpf_conf->planes;
 
-	return ioctl (entity->io_entity->fd, VIDIOC_S_FMT, &fmt);
+	if (ioctl (entity->io_entity->fd, VIDIOC_S_FMT, &fmt)) {
+		viper_log("%s: VIDIOC_S_FMT failed %d\n", __FUNCTION__);
+		return -1;
+	}
+	return 0;
 }
 
 
@@ -114,13 +135,21 @@ int configure_uds(struct viper_entity *entity, void *args)
 	sfmt.format.code = uds_conf->code;
 	sfmt.format.field = V4L2_FIELD_NONE;
 	sfmt.format.colorspace = V4L2_COLORSPACE_SRGB;
-	if (ioctl (entity->fd, VIDIOC_SUBDEV_S_FMT, &sfmt))
+	if (ioctl (entity->fd, VIDIOC_SUBDEV_S_FMT, &sfmt)) {
+		viper_log("%s: VIDIOC_SUBDEV_S_FMT failed %d\n", __FUNCTION__,
+			sfmt.pad);
 		return -1;
+	}
 
 	sfmt.pad = 1;
 	sfmt.format.width = uds_conf->out_width;
 	sfmt.format.height = uds_conf->out_height;
-	return ioctl (entity->fd, VIDIOC_SUBDEV_S_FMT, &sfmt);
+	if (ioctl (entity->fd, VIDIOC_SUBDEV_S_FMT, &sfmt)) {
+		viper_log("%s: VIDIOC_SUBDEV_S_FMT failed %d\n", __FUNCTION__,
+			sfmt.pad);
+		return -1;
+	}
+	return 0;
 }
 
 
