@@ -2,7 +2,7 @@ LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
 LOCAL_C_INCLUDES := \
-	$(LOCAL_PATH)/../../include \
+	hardware/renesas/shmobile/libshvio/include \
 	external/libuiomux/include
 
 #LOCAL_CFLAGS := -DDEBUG
