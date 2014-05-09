@@ -1,7 +1,6 @@
 /*
  * libviper: A library for controlling Renesas Video Image Processing
  * Copyright (C) 2014 Igel Co., Ltd.
- * Copyright (C) 2014 Renesas Electronics Corporation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
