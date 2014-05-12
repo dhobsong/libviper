@@ -151,4 +151,53 @@ int configure_uds(struct viper_entity *entity, void *args)
 	return 0;
 }
 
+#define BRU_OUTPUT_PAD 4
+int configure_bru(struct viper_entity *entity, void *args)
+{
+	struct viper_bru_config *bru_conf = (struct viper_bru_config *)args;
+	struct v4l2_subdev_selection sel;
+	struct v4l2_subdev_format sfmt;
+	int i;
 
+	memset(&sfmt, 0, sizeof(struct v4l2_subdev_format));
+	memset(&sel, 0, sizeof(struct v4l2_subdev_selection));
+	sfmt.which = V4L2_SUBDEV_FORMAT_ACTIVE;
+	sfmt.format.code = bru_conf->code;
+	sfmt.format.field = V4L2_FIELD_NONE;
+	sfmt.format.colorspace = V4L2_COLORSPACE_SRGB;
+	for (i = 0; i < bru_conf->inputs; i++) {
+		sfmt.pad = i;
+		sfmt.format.width = bru_conf->in_widths[i];
+		sfmt.format.height = bru_conf->in_heights[i];
+		if (ioctl (entity->fd, VIDIOC_SUBDEV_S_FMT, &sfmt)) {
+			viper_log("%s: VIDIOC_SUBDEV_S_FMT failed %d\n",
+				__FUNCTION__, sfmt.pad);
+			return -1;
+		}
+	}
+
+	sfmt.pad = BRU_OUTPUT_PAD;
+	sfmt.format.width = bru_conf->out_width;
+	sfmt.format.height = bru_conf->out_height;
+	if (ioctl (entity->fd, VIDIOC_SUBDEV_S_FMT, &sfmt)) {
+		viper_log("%s: VIDIOC_SUBDEV_S_FMT failed %d\n",
+			__FUNCTION__, sfmt.pad);
+			return -1;
+	}
+
+	sel.which = V4L2_SUBDEV_FORMAT_ACTIVE;
+	sel.target = V4L2_SUBDEV_SEL_TGT_COMPOSE_ACTUAL;
+	for (i = 0; i < bru_conf->inputs; i++) {
+		sel.pad = i;
+		sel.r.left = bru_conf->in_lefts[i];
+		sel.r.top = bru_conf->in_tops[i];
+		sel.r.width = bru_conf->in_widths[i];
+		sel.r.height = bru_conf->in_heights[i];
+		if (ioctl (entity->fd, VIDIOC_SUBDEV_S_SELECTION, &sel)) {
+			viper_log("%s: VIDIOC_SUBDEV_S_FMT failed %d\n",
+				__FUNCTION__, sel.pad);
+			return -1;
+		}
+	}
+	return 0;
+}

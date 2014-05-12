@@ -35,6 +35,7 @@
 #define VIPER_CAPS_INPUT 		0x1
 #define VIPER_CAPS_OUTPUT 	0x2
 #define VIPER_CAPS_RESIZE 	0x4
+#define VIPER_CAPS_BLEND 	0x8
 
 
 #define MAX_SUBPIPES 4

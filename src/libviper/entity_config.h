@@ -58,4 +58,19 @@ struct viper_uds_config {
 };
 
 int configure_uds(struct viper_entity *entity, void *args);
+
+#define BRU_MAX_INPUTS 4
+
+struct viper_bru_config {
+	int in_widths[BRU_MAX_INPUTS];
+	int in_heights[BRU_MAX_INPUTS];
+	int in_tops[BRU_MAX_INPUTS];
+	int in_lefts[BRU_MAX_INPUTS];
+	int out_width;
+	int out_height;
+	int inputs;
+	enum v4l2_mbus_pixelcode code;
+};
+
+int configure_bru(struct viper_entity *entity, void *args);
 #endif

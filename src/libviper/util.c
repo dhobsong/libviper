@@ -80,6 +80,11 @@ const struct entity_capability entity_cap_list[] = {
 		.caps = VIPER_CAPS_RESIZE,
 		.config = configure_uds,
 	},
+	{
+		.name = "bru",
+		.caps = VIPER_CAPS_BLEND,
+		.config = configure_bru,
+	},
 };
 
 const struct entity_capability * lookup_entity_caps(const char *name)
@@ -343,42 +348,66 @@ static int enable_links(struct viper_device *dev,
 	int ret, i;
 	struct viper_entity *from;
 	struct media_links_enum links;
+	int pipe_index;
 
-	from = dev->subpipe_final[dev->active_subpipe];
-	if (!from) {
-		ret = 0;
-		goto no_link;
-	}
 
-	memset(&links, 0, sizeof (struct media_links_enum));
-	links.entity = from->media_id;
-	links.pads = NULL;
-	links.links = calloc(from->links, sizeof(struct media_link_desc));
+	if (to->caps->caps & VIPER_CAPS_INPUT)
+		dev->active_subpipe++;
 
-	ret = ioctl(dev->media_fd, MEDIA_IOC_ENUM_LINKS, &links);
-	if (ret)
-		goto links_done;
+	if (dev->active_subpipe < 1)
+		return -1;
 
-	for (i = 0; i < from->links; i++) {
-		if (links.links[i].sink.entity == to->media_id) {
-			struct media_link_desc *update_link;
-			update_link = &links.links[i];
-			update_link->flags |= MEDIA_LNK_FL_ENABLED;
-			ret = ioctl(dev->media_fd, MEDIA_IOC_SETUP_LINK,
-				update_link);
-			if (!ret)
-				break;
-			else if (errno == EBUSY)
-				continue;
-			else
-				goto links_done;
+	if (to->caps->caps & VIPER_CAPS_BLEND)
+		pipe_index = 0;
+	else
+		pipe_index = dev->active_subpipe - 1;
+
+	do {
+		from = dev->subpipe_final[pipe_index];
+		if (!from) {
+			ret = 0;
+			goto no_link;
 		}
-	}
+
+		memset(&links, 0, sizeof (struct media_links_enum));
+		links.entity = from->media_id;
+		links.pads = NULL;
+		links.links = calloc(from->links,
+					sizeof(struct media_link_desc));
+
+		ret = ioctl(dev->media_fd, MEDIA_IOC_ENUM_LINKS, &links);
+		if (ret)
+			goto links_done;
+
+		for (i = 0; i < from->links; i++) {
+			if (links.links[i].sink.entity == to->media_id) {
+				if (to->caps->caps & VIPER_CAPS_BLEND &&
+						links.links[i].sink.index !=
+						 pipe_index)
+					continue;
+				struct media_link_desc *update_link;
+				update_link = &links.links[i];
+				update_link->flags |= MEDIA_LNK_FL_ENABLED;
+				ret = ioctl(dev->media_fd,
+					MEDIA_IOC_SETUP_LINK, update_link);
+				if (!ret)
+					break;
+				else if (errno == EBUSY)
+					continue;
+				else
+					return -1;
+			}
+		}
+		free(links.links);
+	} while ((to->caps->caps & VIPER_CAPS_BLEND) &&
+				(++pipe_index < dev->active_subpipe));
+
+	if (to->caps->caps & VIPER_CAPS_BLEND)
+		dev->active_subpipe = 1;
 
 links_done:
-	free(links.links);
 no_link:
-	dev->subpipe_final[dev->active_subpipe] = to;
+	dev->subpipe_final[dev->active_subpipe - 1] = to;
 	return ret;
 }
 

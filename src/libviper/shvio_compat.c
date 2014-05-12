@@ -57,6 +57,12 @@ static int is_resize(const struct ren_vid_surface *src_surface,
 		(src_surface->h != dst_surface->h));
 }
 
+static int is_resize_rect(const struct ren_vid_surface *src)
+{
+	return ((src->blend_out.w && (src->w != src->blend_out.w)) ||
+		(src->blend_out.h && (src->h != src->blend_out.h)));
+}
+
 static const struct vio_format format_table[] = {
         { REN_NV12, V4L2_PIX_FMT_NV12M, 2 },
         { REN_NV16, V4L2_PIX_FMT_NV16M, 2 },
@@ -285,6 +291,122 @@ int shvio_setup(SHVIO *vio,
 	vio->pipeline = pipeline;
 	return 0;
 }
+int
+shvio_setup_blend(
+	SHVIO *vio,
+	const struct ren_vid_rect *virt,
+	const struct ren_vid_surface *const *src_list,
+	int src_count,
+	const struct ren_vid_surface *dst)
+{
+
+	int i, ret = 0;
+	struct viper_rpf_config *rpf_set;
+	struct viper_bru_config *bru_set;
+	struct viper_uds_config *uds_set;
+	struct viper_wpf_config wpf_set;
+	int *input_planes, *caps;
+	void **args;
+	int output_planes;
+	int num_ents = 0;
+	struct viper_pipeline *pipeline;
+	struct viper_device *device = vio->device;
+
+	bru_set = calloc(1, sizeof (struct viper_bru_config));
+	input_planes = calloc(src_count, sizeof (int));
+	caps = calloc(src_count * 2 + 2, sizeof (int));
+	args = calloc(src_count * 2 + 2, sizeof (void *));
+	for (i = 0; i < src_count; i++) {
+		rpf_set = calloc(1, sizeof (struct viper_rpf_config));
+		input_planes[i] = setup_rpf(rpf_set, src_list[i]);		
+		caps[num_ents] = VIPER_CAPS_INPUT;
+		args[num_ents] = rpf_set;
+		bru_set->in_lefts[i] = src_list[i]->blend_out.x;
+		bru_set->in_tops[i] = src_list[i]->blend_out.y;
+		bru_set->in_widths[i] = src_list[i]->w;
+		bru_set->in_heights[i] = src_list[i]->h;
+		num_ents++;
+		
+		if (is_resize_rect(src_list[i])) {
+			uds_set = calloc(1, sizeof (struct viper_bru_config));
+			uds_set->in_width = src_list[i]->w;
+			uds_set->in_height = src_list[i]->h;
+			uds_set->out_width = src_list[i]->blend_out.w;
+			uds_set->out_height = src_list[i]->blend_out.h;
+			uds_set->code = rpf_set->code;
+			caps[num_ents] = VIPER_CAPS_RESIZE;
+			args[num_ents] = uds_set;
+			num_ents++;
+		}
+	}
+	bru_set->inputs = src_count;
+	bru_set->out_width = dst->w;
+	bru_set->out_height = dst->h;
+	caps[num_ents] = VIPER_CAPS_BLEND;
+	args[num_ents] = bru_set;
+	num_ents++;
+	
+	output_planes = setup_wpf(&wpf_set, dst, dst->format);
+	caps[num_ents] = VIPER_CAPS_OUTPUT;
+	args[num_ents] = &wpf_set;
+	num_ents++;
+
+	bru_set->code = wpf_set.in_code;
+
+	pipeline = create_pipeline(device, caps, args, num_ents);
+
+	if (!pipeline) {
+		viper_log("%s: pipeline config failed\n", __FUNCTION__);
+		ret = -1;
+		goto end;
+	}
+
+	memcpy(pipeline->input_planes, input_planes, src_count * sizeof(int));
+	for (i = 0; i < src_count; i++) {
+		if (start_io_device(pipeline->input_fds[i], true)) {
+			viper_log("%s: cannot start input device\n",
+							__FUNCTION__);
+			ret = -1;
+			goto end;
+		}
+		pipeline->input_addr[i][0] = src_list[i]->py;
+		pipeline->input_size[i][0] = src_list[i]->h *
+			size_y(src_list[i]->format, src_list[i]->pitch, 0);
+
+		if (input_planes > 1) {
+			pipeline->input_addr[i][1] = src_list[i]->pc;
+			pipeline->input_size[i][1] = src_list[i]->h *
+			    size_c(src_list[i]->format, src_list[i]->pitch, 0);
+		}
+	}
+
+	pipeline->output_planes[0] = output_planes;
+
+	if (start_io_device(pipeline->output_fds[0], false)) {
+		viper_log("%s: cannot start output device\n", __FUNCTION__);
+		ret = -1;
+	
+	}
+
+	pipeline->output_addr[0][0] = dst->py;
+	pipeline->output_size[0][0] = dst->h *
+		size_y(dst->format, dst->pitch, 0);
+
+	if (output_planes > 1) {
+		pipeline->input_addr[0][1] = dst->pc;
+		pipeline->input_size[0][1] = dst->h *
+			size_c(dst->format, dst->pitch, 0);
+	}
+	
+	vio->pipeline = pipeline;
+end:
+	for (i = 0; i < num_ents - 1; i++)
+		free(args[i]);
+	free(args);
+	free(caps);
+	free(input_planes);
+	return ret;
+}
 
 int shvio_rotate(SHVIO *vio,
 	const struct ren_vid_surface *src_surface,
@@ -316,7 +438,8 @@ void shvio_start(SHVIO *vio)
 		ret |= queue_buffer(pipe->input_fds[i], pipe->input_addr[i],
 			pipe->input_size[i], pipe->input_planes[i], true);
 		if (ret)
-			viper_log("%s: queue input buffer fail. %d\n", errno);
+			viper_log("%s: queue input buffer fail. %d\n",
+				__FUNCTION__, errno);
 	}
 
 	ret = 0;
