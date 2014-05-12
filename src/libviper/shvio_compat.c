@@ -161,6 +161,51 @@ shvio_set_dst(
 	pipe->output_addr[0][1] = dst_pc;
 }
 
+static int setup_rpf(struct viper_rpf_config *rpf_set,
+		      const struct ren_vid_surface *surface)
+{
+	const struct vio_format *fmt;
+	fmt = lookup_vio_color(surface->format);
+	if (!fmt)
+		return -1;
+	rpf_set->width = surface->w;
+	rpf_set->height = surface->h;
+	rpf_set->bpitch0 = size_y(fmt->format, surface->pitch,
+		surface->bpitchy);
+	rpf_set->bpitch1 = size_y(fmt->format, surface->pitch,
+		surface->bpitchc);
+	rpf_set->planes = fmt->v4l_planes;
+	rpf_set->format = fmt->v4l_format;
+	rpf_set->code = color_fmt_to_code(fmt->v4l_format);
+	return fmt->v4l_planes;
+}
+
+static int setup_wpf(struct viper_wpf_config *wpf_set,
+		     const struct ren_vid_surface *surface,
+		     ren_vid_format_t vio_color)
+{
+	const struct vio_format *in_fmt, *out_fmt;
+	in_fmt = lookup_vio_color(vio_color);
+	if (!in_fmt)
+		return -1;
+	out_fmt = lookup_vio_color(surface->format);
+	if (!out_fmt)
+		return -1;
+	wpf_set->width = surface->w;
+	wpf_set->height = surface->h;
+	wpf_set->bpitch0 = size_y(out_fmt->format, surface->pitch,
+		surface->bpitchy);
+	wpf_set->bpitch1 = size_y(out_fmt->format, surface->pitch,
+		surface->bpitchc);
+	wpf_set->planes = out_fmt->v4l_planes;
+	wpf_set->in_format = in_fmt->v4l_format;
+	wpf_set->in_code = color_fmt_to_code(in_fmt->v4l_format);
+	wpf_set->out_format = out_fmt->v4l_format;
+	wpf_set->out_code = color_fmt_to_code(out_fmt->v4l_format);
+	return out_fmt->v4l_planes;
+}
+
+
 int shvio_setup(SHVIO *vio,
 	const struct ren_vid_surface *src_surface,
         const struct ren_vid_surface *dst_surface,
@@ -174,38 +219,13 @@ int shvio_setup(SHVIO *vio,
 
 	struct viper_device *device = vio->device;
 
-	fmt = lookup_vio_color(src_surface->format);
-	if (!fmt)
-		return -1;
-
-	input_planes = fmt->v4l_planes;
-	vio->rpf_set.width = src_surface->w;
-	vio->rpf_set.height = src_surface->h;
-	vio->rpf_set.bpitch0 = size_y(fmt->format, src_surface->pitch, src_surface->bpitchy);
-	vio->rpf_set.bpitch1 = size_y(fmt->format, src_surface->pitch, src_surface->bpitchc);
-	vio->rpf_set.planes = input_planes;
-	vio->rpf_set.format = fmt->v4l_format;
-	vio->rpf_set.code = color_fmt_to_code(fmt->v4l_format);
+	input_planes = setup_rpf(&vio->rpf_set, src_surface);
 
 	caps[num_ents] = VIPER_CAPS_INPUT;
 	args[num_ents] = &vio->rpf_set;
 	num_ents++;
-
-	vio->wpf_set.in_format = fmt->v4l_format;
-	vio->wpf_set.in_code = color_fmt_to_code(fmt->v4l_format);
-
-	fmt = lookup_vio_color(dst_surface->format);
-	if (!fmt)
-		return -1;
-
-	output_planes = fmt->v4l_planes;
-	vio->wpf_set.width = dst_surface->w;
-	vio->wpf_set.height = dst_surface->h;
-	vio->wpf_set.bpitch0 = size_y(fmt->format, dst_surface->pitch, dst_surface->bpitchy);
-	vio->wpf_set.bpitch1 = size_c(fmt->format, dst_surface->pitch, dst_surface->bpitchc);
-	vio->wpf_set.planes = output_planes;
-	vio->wpf_set.out_format = fmt->v4l_format;
-	vio->wpf_set.out_code = color_fmt_to_code(fmt->v4l_format);
+	output_planes = setup_wpf(&vio->wpf_set, dst_surface,
+		src_surface->format);
 
 	if (is_resize(src_surface, dst_surface)) {
 		vio->uds_set.in_width = vio->rpf_set.width;
