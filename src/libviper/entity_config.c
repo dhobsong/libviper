@@ -67,7 +67,7 @@ int configure_rpf(struct viper_entity *entity, void *args)
 	fmt.fmt.pix_mp.num_planes = rpf_conf->planes;
 
 	if (ioctl (entity->io_entity->fd, VIDIOC_S_FMT, &fmt)) {
-		viper_log("%s: VIDIOC_S_FMT failed %d\n", __FUNCTION__);
+		viper_log("%s: VIDIOC_S_FMT failed\n", __FUNCTION__);
 		return -1;
 	}
 	return 0;
@@ -113,7 +113,7 @@ int configure_wpf(struct viper_entity *entity, void *args)
 	fmt.fmt.pix_mp.num_planes = wpf_conf->planes;
 
 	if (ioctl (entity->io_entity->fd, VIDIOC_S_FMT, &fmt)) {
-		viper_log("%s: VIDIOC_S_FMT failed %d\n", __FUNCTION__);
+		viper_log("%s: VIDIOC_S_FMT failed\n", __FUNCTION__);
 		return -1;
 	}
 	return 0;

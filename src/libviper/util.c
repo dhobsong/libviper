@@ -468,7 +468,7 @@ int stop_io_device(int fd, bool input) {
 	reqbuf.type = buftype;
 	reqbuf.memory = V4L2_MEMORY_USERPTR;
 	if(ioctl(fd, VIDIOC_REQBUFS, &reqbuf)) {
-		printf("reqbufs 0 failed for %s stream on %d - %d\n",
+		printf("reqbufs 0 failed for %s on %d - %d\n",
 			input ? "input" : "output", fd, errno);
 		return -1;
 	}
