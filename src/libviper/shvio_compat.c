@@ -76,10 +76,10 @@ static const struct vio_format format_table[] = {
         { REN_RGB24, V4L2_PIX_FMT_RGB24, 1 },
         { REN_BGR24, V4L2_PIX_FMT_BGR24, 1 },
         { REN_RGB32, V4L2_PIX_FMT_RGB32, 1 },
-        { REN_BGR32, V4L2_PIX_FMT_BGR32, 1 },
-        { REN_XRGB32, V4L2_PIX_FMT_RGB32, 1 },
-        { REN_BGRA32, V4L2_PIX_FMT_BGR32, 1 },
-        { REN_ARGB32, V4L2_PIX_FMT_RGB32, 1 },
+        { REN_BGR32, V4L2_PIX_FMT_RGB332, 1 },
+        { REN_XRGB32, V4L2_PIX_FMT_BGR32, 1 },
+        { REN_BGRA32, V4L2_PIX_FMT_RGB332, 1 },
+        { REN_ARGB32, V4L2_PIX_FMT_BGR32, 1 },
 };
 
 static const struct vio_format * lookup_vio_color(ren_vid_format_t vio_color) {
