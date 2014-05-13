@@ -340,13 +340,17 @@ shvio_setup_blend(
 		}
 	}
 	bru_set->inputs = src_count;
-	bru_set->out_width = dst->w;
-	bru_set->out_height = dst->h;
+	bru_set->out_width = virt->w;
+	bru_set->out_height = virt->h;
 	caps[num_ents] = VIPER_CAPS_BLEND;
 	args[num_ents] = bru_set;
 	num_ents++;
 	
 	output_planes = setup_wpf(&wpf_set, dst, dst->format);
+	wpf_set.width = virt->w;
+	wpf_set.height = virt->h;
+	wpf_set.bpitch0 = size_y(dst->format, virt->w, 0);
+	wpf_set.bpitch1 = wpf_set.bpitch0;
 	caps[num_ents] = VIPER_CAPS_OUTPUT;
 	args[num_ents] = &wpf_set;
 	num_ents++;
@@ -389,8 +393,8 @@ shvio_setup_blend(
 	}
 
 	pipeline->output_addr[0][0] = dst->py;
-	pipeline->output_size[0][0] = dst->h *
-		size_y(dst->format, dst->pitch, 0);
+	pipeline->output_size[0][0] = virt->h *
+		size_y(dst->format, virt->w, 0);
 
 	if (output_planes > 1) {
 		pipeline->input_addr[0][1] = dst->pc;
