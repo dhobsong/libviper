@@ -334,6 +334,8 @@ shvio_setup_blend(
 			uds_set->out_width = src_list[i]->blend_out.w;
 			uds_set->out_height = src_list[i]->blend_out.h;
 			uds_set->code = rpf_set->code;
+			bru_set->in_widths[i] = src_list[i]->blend_out.w;
+			bru_set->in_heights[i] = src_list[i]->blend_out.h;
 			caps[num_ents] = VIPER_CAPS_RESIZE;
 			args[num_ents] = uds_set;
 			num_ents++;
