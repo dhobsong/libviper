@@ -40,7 +40,7 @@ int configure_rpf(struct viper_entity *entity, void *args)
 	sfmt.pad = 0;
 	sfmt.format.width = rpf_conf->width;
 	sfmt.format.height = rpf_conf->height;
-	sfmt.format.code = rpf_conf->code;
+	sfmt.format.code = rpf_conf->in_code;
 	sfmt.format.field = V4L2_FIELD_NONE;
 	sfmt.format.colorspace = V4L2_COLORSPACE_SRGB;
 	if (ioctl (entity->fd, VIDIOC_SUBDEV_S_FMT, &sfmt)) {
@@ -50,6 +50,7 @@ int configure_rpf(struct viper_entity *entity, void *args)
 	}
 
 	sfmt.pad = 1;
+	sfmt.format.code = rpf_conf->out_code;
 	if (ioctl (entity->fd, VIDIOC_SUBDEV_S_FMT, &sfmt)) {
 		viper_log("%s: VIDIOC_SUBDEV_S_FMT failed %d\n", __FUNCTION__,
 			sfmt.pad);
@@ -60,7 +61,7 @@ int configure_rpf(struct viper_entity *entity, void *args)
 	fmt.type = V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
 	fmt.fmt.pix_mp.width = rpf_conf->width;
 	fmt.fmt.pix_mp.height = rpf_conf->height;
-	fmt.fmt.pix_mp.pixelformat = rpf_conf->format;
+	fmt.fmt.pix_mp.pixelformat = rpf_conf->in_format;
 	fmt.fmt.pix_mp.field = V4L2_FIELD_NONE;
 	fmt.fmt.pix_mp.plane_fmt[0].bytesperline = rpf_conf->bpitch0;
 	fmt.fmt.pix_mp.plane_fmt[1].bytesperline = rpf_conf->bpitch1;

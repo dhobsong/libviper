@@ -30,8 +30,10 @@ struct viper_rpf_config {
 	int bpitch1;
 	int bpitch2;
 	int planes;
-	uint32_t format;
-	enum v4l2_mbus_pixelcode code;
+	uint32_t in_format;
+	enum v4l2_mbus_pixelcode in_code;
+	uint32_t out_format;
+	enum v4l2_mbus_pixelcode out_code;
 };
 int configure_rpf(struct viper_entity *entity, void *args);
 

@@ -168,12 +168,20 @@ shvio_set_dst(
 }
 
 static int setup_rpf(struct viper_rpf_config *rpf_set,
-		      const struct ren_vid_surface *surface)
+		      const struct ren_vid_surface *surface,
+		      ren_vid_format_t vio_color)
 {
-	const struct vio_format *fmt;
+	const struct vio_format *fmt, *out_fmt;
 	fmt = lookup_vio_color(surface->format);
 	if (!fmt)
 		return -1;
+	if (!vio_color) {
+		out_fmt = fmt;
+	} else {
+		 out_fmt = lookup_vio_color(vio_color);
+		if (!out_fmt)
+			return -1;
+	}
 	rpf_set->width = surface->w;
 	rpf_set->height = surface->h;
 	rpf_set->bpitch0 = size_y(fmt->format, surface->pitch,
@@ -181,8 +189,10 @@ static int setup_rpf(struct viper_rpf_config *rpf_set,
 	rpf_set->bpitch1 = size_y(fmt->format, surface->pitch,
 		surface->bpitchc);
 	rpf_set->planes = fmt->v4l_planes;
-	rpf_set->format = fmt->v4l_format;
-	rpf_set->code = color_fmt_to_code(fmt->v4l_format);
+	rpf_set->in_format = fmt->v4l_format;
+	rpf_set->in_code = color_fmt_to_code(fmt->v4l_format);
+	rpf_set->out_format = out_fmt->v4l_format;
+	rpf_set->out_code = color_fmt_to_code(out_fmt->v4l_format);
 	return fmt->v4l_planes;
 }
 
@@ -225,7 +235,8 @@ int shvio_setup(SHVIO *vio,
 
 	struct viper_device *device = vio->device;
 
-	input_planes = setup_rpf(&vio->rpf_set, src_surface);
+	input_planes = setup_rpf(&vio->rpf_set, src_surface,
+		src_surface->format);
 
 	caps[num_ents] = VIPER_CAPS_INPUT;
 	args[num_ents] = &vio->rpf_set;
@@ -238,7 +249,7 @@ int shvio_setup(SHVIO *vio,
 		vio->uds_set.in_height = vio->rpf_set.height;
 		vio->uds_set.out_width = vio->wpf_set.width;
 		vio->uds_set.out_height = vio->wpf_set.height;
-		vio->uds_set.code = vio->rpf_set.code;
+		vio->uds_set.code = vio->rpf_set.out_code;
 		caps[num_ents] = VIPER_CAPS_RESIZE;
 		args[num_ents] = &vio->uds_set;
 		num_ents++;
@@ -318,7 +329,7 @@ shvio_setup_blend(
 	args = calloc(src_count * 2 + 2, sizeof (void *));
 	for (i = 0; i < src_count; i++) {
 		rpf_set = calloc(1, sizeof (struct viper_rpf_config));
-		input_planes[i] = setup_rpf(rpf_set, src_list[i]);		
+		input_planes[i] = setup_rpf(rpf_set, src_list[i], dst->format);		
 		caps[num_ents] = VIPER_CAPS_INPUT;
 		args[num_ents] = rpf_set;
 		bru_set->in_lefts[i] = src_list[i]->blend_out.x;
@@ -333,7 +344,7 @@ shvio_setup_blend(
 			uds_set->in_height = src_list[i]->h;
 			uds_set->out_width = src_list[i]->blend_out.w;
 			uds_set->out_height = src_list[i]->blend_out.h;
-			uds_set->code = rpf_set->code;
+			uds_set->code = rpf_set->out_code;
 			bru_set->in_widths[i] = src_list[i]->blend_out.w;
 			bru_set->in_heights[i] = src_list[i]->blend_out.h;
 			caps[num_ents] = VIPER_CAPS_RESIZE;
