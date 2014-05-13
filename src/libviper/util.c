@@ -407,7 +407,13 @@ static int enable_links(struct viper_device *dev,
 
 links_done:
 no_link:
-	dev->subpipe_final[dev->active_subpipe - 1] = to;
+	if (to->caps->caps & VIPER_CAPS_OUTPUT) {
+		dev->subpipe_final[dev->active_subpipe - 1] = NULL;
+		dev->active_subpipe--;
+	} else {
+		dev->subpipe_final[dev->active_subpipe - 1] = to;
+	}
+
 	return ret;
 }
 
