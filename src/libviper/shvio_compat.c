@@ -453,7 +453,8 @@ void shvio_start(SHVIO *vio)
 		ret |= queue_buffer(pipe->output_fds[i], pipe->output_addr[i],
 			pipe->output_size[i], pipe->input_planes[i], false);
 		if (ret)
-			viper_log("%s: queue output buffer fail. %d\n", errno);
+			viper_log("%s: queue output buffer fail. %d\n",
+				__FUNCTION__, errno);
 	}
 }
 

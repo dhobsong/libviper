@@ -520,13 +520,13 @@ int start_io_device(int fd, bool input) {
 
 
 	if(ioctl(fd, VIDIOC_REQBUFS, &reqbuf)) {
-		printf("reqbufs failed for %s stream on %d - %d\n",
+		viper_log("reqbufs failed for %s stream on %d - %d\n",
 			input ? "input" : "output", fd, errno);
 		return -1;
 	}
 
 	if(ioctl(fd, VIDIOC_STREAMON, &buftype)) {
-		printf("stream on failed for %s stream on %d - %d\n",
+		viper_log("stream on failed for %s stream on %d - %d\n",
 			input ? "input" : "output", fd, errno);
 		return -1;
 	}
