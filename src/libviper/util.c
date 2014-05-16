@@ -296,18 +296,19 @@ int init_context () {
 /*  ----------------------------------------------- */
 
 static void entity_unlock(struct viper_entity *entity) {
-	pthread_mutex_unlock(&entity->lock);
 	flock(entity->fd, LOCK_UN);
+	pthread_mutex_unlock(&entity->lock);
 }
 
 static int try_entity_lock(struct viper_entity *entity) {
-	if (!flock(entity->fd, LOCK_EX | LOCK_NB)) {
-		if (!pthread_mutex_trylock(&entity->lock))
-			return 0;
-		else
-			flock(entity->fd, LOCK_UN);
+	if (pthread_mutex_trylock(&entity->lock))
+		return -1;
+
+	if (flock(entity->fd, LOCK_EX | LOCK_NB)) {
+		pthread_mutex_unlock(&entity->lock);
+		return -1;
 	}
-	return -1;
+	return 0;
 }
 
 
@@ -443,8 +444,8 @@ void free_pipeline(struct viper_device *dev, struct viper_pipeline *pipe)
 {
 	struct viper_entity *entity = pipe->locked_entities;
 	while (entity) {
-		entity_unlock(entity);
 		disable_links(dev, entity);
+		entity_unlock(entity);
 		entity = entity->next_locked;
 	}
 	
