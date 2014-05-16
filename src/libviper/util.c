@@ -470,9 +470,14 @@ struct viper_pipeline * create_pipeline(struct viper_device *dev,
 
 	for (i = 0; i < length; i++) {
 		entity = get_free_entity(dev, pipe, caps_list[i]);
-		if (!entity || entity->caps->config(entity, args_list[i])) {
+		if (!entity) {
 			viper_log("%s: No free enities for cap type %d",
 				__FUNCTION__, caps_list[i]);
+			goto error_out;
+		}
+		if (entity->caps->config(entity, args_list[i])) {
+			viper_log("%s: entity config error - %s",
+				__FUNCTION__, entity->name);
 			goto error_out;
 		}
 		if (caps_list[i] & VIPER_CAPS_INPUT)
