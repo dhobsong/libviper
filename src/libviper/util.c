@@ -342,28 +342,29 @@ done:
 }
 
 static int enable_links(struct viper_device *dev,
+		struct viper_pipeline *pipe,
 		struct viper_entity *to,
 		int num_suppipes)
 {
-	int ret, i;
+	int ret =-2, i;
 	struct viper_entity *from;
 	struct media_links_enum links;
 	int pipe_index;
 
 
 	if (to->caps->caps & VIPER_CAPS_INPUT)
-		dev->active_subpipe++;
+		pipe->active_subpipe++;
 
-	if (dev->active_subpipe < 1)
+	if (pipe->active_subpipe < 1)
 		return -1;
 
 	if (to->caps->caps & VIPER_CAPS_BLEND)
 		pipe_index = 0;
 	else
-		pipe_index = dev->active_subpipe - 1;
+		pipe_index = pipe->active_subpipe - 1;
 
 	do {
-		from = dev->subpipe_final[pipe_index];
+		from = pipe->subpipe_final[pipe_index];
 		if (!from) {
 			ret = 0;
 			goto no_link;
@@ -400,18 +401,18 @@ static int enable_links(struct viper_device *dev,
 		}
 		free(links.links);
 	} while ((to->caps->caps & VIPER_CAPS_BLEND) &&
-				(++pipe_index < dev->active_subpipe));
+				(++pipe_index < pipe->active_subpipe));
 
 	if (to->caps->caps & VIPER_CAPS_BLEND)
-		dev->active_subpipe = 1;
+		pipe->active_subpipe = 1;
 
 links_done:
 no_link:
 	if (to->caps->caps & VIPER_CAPS_OUTPUT) {
-		dev->subpipe_final[dev->active_subpipe - 1] = NULL;
-		dev->active_subpipe--;
+		pipe->subpipe_final[pipe->active_subpipe - 1] = NULL;
+		pipe->active_subpipe--;
 	} else {
-		dev->subpipe_final[dev->active_subpipe - 1] = to;
+		pipe->subpipe_final[pipe->active_subpipe - 1] = to;
 	}
 
 	return ret;
@@ -475,7 +476,7 @@ struct viper_pipeline * create_pipeline(struct viper_device *dev,
 		if (caps_list[i] & VIPER_CAPS_OUTPUT)
 			pipe->output_fds[pipe->num_outputs++] = 
 				entity->io_entity->fd;
-		if (enable_links(dev, entity, 1)) {
+		if (enable_links(dev, pipe, entity, 1)) {
 			viper_log("%s: Entity link failed. caps=%d",
 				__FUNCTION__, caps_list[i]);
 			goto error_out;

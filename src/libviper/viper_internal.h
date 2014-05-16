@@ -74,9 +74,6 @@ struct viper_device {
 	int media_fd;
 	struct viper_entity *entity_list;
 	struct viper_io_entity *io_entity_list;
-	int active_subpipe;
-	struct viper_entity *subpipe_final[MAX_SUBPIPES];
-//	struct viper_entity *locked_entities;
 	struct viper_device *next;
 };
 
@@ -94,6 +91,8 @@ struct viper_pipeline {
 	int	num_inputs;
 	int	num_outputs;
 	struct viper_entity *locked_entities;
+	int active_subpipe;
+	struct viper_entity *subpipe_final[MAX_SUBPIPES];
 
 	int	input_fds[MAX_INPUT_BUFFERS];
 	void	*input_addr[MAX_INPUT_BUFFERS][MAX_PLANES];
