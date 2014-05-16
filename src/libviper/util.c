@@ -42,6 +42,10 @@
 
 #define DEBUG
 
+#ifdef DEBUG
+void dump();
+#endif
+
 UIOMux *uiomux;
 struct viper_context viper = {
 	.lock = PTHREAD_MUTEX_INITIALIZER,
@@ -487,6 +491,9 @@ struct viper_pipeline * create_pipeline(struct viper_device *dev,
 	return pipe;
 
 error_out:
+#ifdef DEBUG
+			dump();
+#endif
 	free_pipeline(dev, pipe);
 	return NULL;
 }
@@ -644,18 +651,21 @@ const char *names[] = {
 
 #ifdef DEBUG
 void dump_entity_and_links(struct viper_device *dev,
-			   int media_id) {
+			   int media_id, char *out) {
 	int i;
 	struct media_links_enum links;
 	struct media_entity_desc media_ent;
+	char add[254];
 	memset(&media_ent, 0, sizeof(struct media_entity_desc));
 	media_ent.id = media_id;
 	if (ioctl(dev->media_fd, MEDIA_IOC_ENUM_ENTITIES, &media_ent)) {
-		printf("error\n");
+		viper_log("error\n");
 		return;
 	}
 
-	printf("%s -> ", media_ent.name);
+	snprintf(add, 254, "%s -> ", media_ent.name);
+	strncat(out, add, 254);
+
 	memset(&links, 0, sizeof (struct media_links_enum));
 	links.entity = media_id;
 	links.pads = NULL;
@@ -665,7 +675,7 @@ void dump_entity_and_links(struct viper_device *dev,
 	for (i = 0; i < media_ent.links; i ++) {
 		if (links.links[i].flags & MEDIA_LNK_FL_ENABLED) {
 			dump_entity_and_links(dev,
-					links.links[i].sink.entity);
+					links.links[i].sink.entity, out);
 		}
 			
 	}
@@ -675,19 +685,31 @@ void dump_links(struct viper_device *dev,
 		struct viper_io_entity *io_entity) {
 	struct media_entity_desc media_ent;
 	char test[255];
+	char out[255];
+	out[0] = '\0';
 
 	memset(&media_ent, 0, sizeof(struct media_entity_desc));
 	media_ent.id = MEDIA_ENT_ID_FLAG_NEXT;
 	while (!ioctl(dev->media_fd, MEDIA_IOC_ENUM_ENTITIES, &media_ent)) {
 		snprintf(test, 255, "%s %s input", dev->name, io_entity->name);
 		if (!strcmp(test, media_ent.name)) {
-			printf("\n");
-			dump_entity_and_links(dev, media_ent.id);
+			dump_entity_and_links(dev, media_ent.id, out);
+			viper_log("%s \n", out);
 			return;
 		}
 		media_ent.id |= MEDIA_ENT_ID_FLAG_NEXT;
 	}
-	printf("Cannot find media id for %s\n", io_entity->name);
+	viper_log("Cannot find media id for %s\n", io_entity->name);
+}
+
+void dump()
+{
+	struct viper_io_entity *io_entity;
+	io_entity = viper.device_list->io_entity_list;
+	while(io_entity) {
+		dump_links(viper.device_list, io_entity);
+		io_entity = io_entity->next;
+	}
 }
 #endif
 #if 0
