@@ -20,12 +20,13 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#include <string.h>
-#include "log.h"
+#include <errno.h>
 #include <linux/videodev2.h>
 #include <linux/v4l2-subdev.h>
+#include <string.h>
 #include <sys/ioctl.h>
 #include "entity_config.h"
+#include "log.h"
 #include "viper_internal.h"
 
 
@@ -68,7 +69,8 @@ int configure_rpf(struct viper_entity *entity, void *args)
 	fmt.fmt.pix_mp.num_planes = rpf_conf->planes;
 
 	if (ioctl (entity->io_entity->fd, VIDIOC_S_FMT, &fmt)) {
-		viper_log("%s: VIDIOC_S_FMT failed\n", __FUNCTION__);
+		viper_log("%s: VIDIOC_S_FMT failed - %d\n", __FUNCTION__,
+			errno);
 		return -1;
 	}
 	return 0;
@@ -114,7 +116,8 @@ int configure_wpf(struct viper_entity *entity, void *args)
 	fmt.fmt.pix_mp.num_planes = wpf_conf->planes;
 
 	if (ioctl (entity->io_entity->fd, VIDIOC_S_FMT, &fmt)) {
-		viper_log("%s: VIDIOC_S_FMT failed\n", __FUNCTION__);
+		viper_log("%s: VIDIOC_S_FMT failed - %d\n", __FUNCTION__,
+			errno);
 		return -1;
 	}
 	return 0;
