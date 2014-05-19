@@ -269,7 +269,7 @@ int shvio_setup(SHVIO *vio,
 
 	if (start_io_device(pipeline->input_fds[0], true)) {
 		viper_log("%s: cannot start input device\n", __FUNCTION__);
-		return -1;
+		goto err_out;
 	}
 	pipeline->input_addr[0][0] = src_surface->py;
 	pipeline->input_size[0][0] = src_surface->h *
@@ -285,7 +285,7 @@ int shvio_setup(SHVIO *vio,
 
 	if (start_io_device(pipeline->output_fds[0], false)) {
 		viper_log("%s: cannot start output device\n", __FUNCTION__);
-		return -1;
+		goto err_out;
 	}
 
 	pipeline->output_addr[0][0] = dst_surface->py;
@@ -301,6 +301,10 @@ int shvio_setup(SHVIO *vio,
 	vio->bundle_lines = vio->bundle_lines_remaining;
 	vio->pipeline = pipeline;
 	return 0;
+
+err_out:
+	free_pipeline(device, pipeline);
+	return -1;
 }
 int
 shvio_setup_blend(
@@ -386,6 +390,7 @@ shvio_setup_blend(
 			viper_log("%s: cannot start input device\n",
 							__FUNCTION__);
 			ret = -1;
+			free_pipeline(device, pipeline);
 			goto end;
 		}
 		pipeline->input_addr[i][0] = src_list[i]->py;
@@ -403,8 +408,9 @@ shvio_setup_blend(
 
 	if (start_io_device(pipeline->output_fds[0], false)) {
 		viper_log("%s: cannot start output device\n", __FUNCTION__);
+		free_pipeline(device, pipeline);
 		ret = -1;
-	
+		goto end;
 	}
 
 	pipeline->output_addr[0][0] = dst->py;
@@ -450,6 +456,9 @@ void shvio_start(SHVIO *vio)
 	int i;
 	int ret;
 
+	if (!pipe)
+		return;
+
 	ret = 0;
 	for (i = 0; i < pipe->num_inputs; i++) {
 		ret |= queue_buffer(pipe->input_fds[i], pipe->input_addr[i],
@@ -491,6 +500,9 @@ static int reconfig_pipeline(struct viper_pipeline *pipe,
 void shvio_start_bundle(SHVIO *vio, int bundle_lines)
 {
 	struct viper_pipeline *pipe = vio->pipeline;
+	if (!pipe)
+		return;
+
 	if (bundle_lines > vio->bundle_lines_remaining)
 		bundle_lines = vio->bundle_lines_remaining;
 
@@ -546,6 +558,9 @@ int shvio_wait(SHVIO *vio)
 	struct viper_pipeline *pipe = vio->pipeline;
 	int i;
 	int ret = 0;
+
+	if (!pipe)
+		return -1;
 
 	vio->bundle_lines_remaining -= vio->bundle_lines;
 	if (vio->bundle_lines_remaining <= 0) {
