@@ -532,22 +532,28 @@ void shvio_start_bundle(SHVIO *vio, int bundle_lines)
 		stop_io_device(pipe->input_fds[0], true);
 		stop_io_device(pipe->output_fds[0], false);
 		reconfig_pipeline(pipe, caps, args, pipe_count);
-		start_io_device(pipe->input_fds[0], true);
-		start_io_device(pipe->output_fds[0], false);
+		if(start_io_device(pipe->input_fds[0], true))
+			return;
+		if(start_io_device(pipe->output_fds[0], false))
+			return;
 
 		vio->output_y_offset = vio->wpf_set.bpitch0 * wpf_lines;
 		vio->output_c_offset = vio->wpf_set.bpitch1 * wpf_lines;
 	}
 
 	if (queue_buffer(pipe->input_fds[0], pipe->input_addr[0],
-			pipe->input_size[0], pipe->input_planes[0], true))
+			pipe->input_size[0], pipe->input_planes[0], true)) {
 		viper_log("%s: queue input buffer fail. %d\n", __FUNCTION__,
 			errno);
+		return;
+	}
 
 	if (queue_buffer(pipe->output_fds[0], pipe->output_addr[0],
-		pipe->output_size[0], pipe->input_planes[0], false))
+		pipe->output_size[0], pipe->input_planes[0], false)) {
 		viper_log("%s: queue output buffer fail. %d\n", __FUNCTION__,
-									errno);
+								errno);
+		return;
+	}
 
 	pipe->output_addr[0][0] += vio->output_y_offset;
 	pipe->output_addr[0][1] += vio->output_c_offset;
