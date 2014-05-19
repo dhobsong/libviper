@@ -570,11 +570,15 @@ int shvio_wait(SHVIO *vio)
 
 	vio->bundle_lines_remaining -= vio->bundle_lines;
 	if (vio->bundle_lines_remaining <= 0) {
-		for (i = 0; i < pipe->num_inputs; i++)
+		for (i = 0; i < pipe->num_inputs; i++) {
+			dequeue_buffer(pipe->input_fds[i], true);
 			stop_io_device(pipe->input_fds[i], true);
+		}
 
-		for (i = 0; i < pipe->num_outputs; i++)
+		for (i = 0; i < pipe->num_outputs; i++) {
+			dequeue_buffer(pipe->output_fds[i], false);
 			stop_io_device(pipe->output_fds[i], false);
+		}
 
 		free_pipeline(vio->device, pipe);
 	} else {
