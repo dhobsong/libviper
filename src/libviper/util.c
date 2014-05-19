@@ -449,9 +449,14 @@ void free_pipeline(struct viper_device *dev, struct viper_pipeline *pipe)
 	struct viper_entity *entity = pipe->locked_entities;
 	while (entity) {
 		disable_links(dev, entity);
+		entity = entity->next_locked;
+	}
+	entity = pipe->locked_entities;
+	while (entity) {
 		entity_unlock(entity);
 		entity = entity->next_locked;
 	}
+	free(pipe);
 	
 }
 
