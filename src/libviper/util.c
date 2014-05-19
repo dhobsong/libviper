@@ -553,6 +553,7 @@ int start_io_device(int fd, bool input) {
 	if(ioctl(fd, VIDIOC_STREAMON, &buftype)) {
 		viper_log("stream on failed for %s stream on %d - %d\n",
 			input ? "input" : "output", fd, errno);
+		stop_io_device(fd, input);
 		return -1;
 	}
 	return 0;
