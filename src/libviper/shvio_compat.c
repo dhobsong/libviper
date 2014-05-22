@@ -133,6 +133,21 @@ SHVIO *shvio_open(void) {
 }
 
 void shvio_close(SHVIO *vio) {
+	struct viper_pipeline *pipe = vio->pipeline;
+	if (pipe) {
+		int i;
+		for (i = 0; i < pipe->num_inputs; i++) {
+			stop_io_device(pipe->input_fds[i], true);
+		}
+
+		for (i = 0; i < pipe->num_outputs; i++) {
+			stop_io_device(pipe->output_fds[i], false);
+		}
+
+		free_pipeline(vio->device, pipe);
+	}
+	free(vio);
+	deinit_context();
 }
 
 void
