@@ -360,8 +360,10 @@ static int disable_links(struct viper_device *dev,
 	links.pads = NULL;
 	links.links = calloc(entity->links, sizeof(struct media_link_desc));
 	ret = ioctl(dev->media_fd, MEDIA_IOC_ENUM_LINKS, &links);
-	if (ret)
+	if (ret) {
+		viper_log("enum links failed - %d\n", errno);
 		goto done;
+	}
 	for (i = 0; i < entity->links; i++) {
 		if (links.links[i].flags & MEDIA_LNK_FL_ENABLED) {
 			if (links.links[i].flags & MEDIA_LNK_FL_IMMUTABLE)
@@ -369,7 +371,7 @@ static int disable_links(struct viper_device *dev,
 			links.links[i].flags &= ~MEDIA_LNK_FL_ENABLED;
 			if(ioctl(dev->media_fd, MEDIA_IOC_SETUP_LINK,
 					&links.links[i]))
-				printf("diable link failed - %d\n", errno);
+				viper_log("diable link failed - %d\n", errno);
 			
 		}
 	}
@@ -415,8 +417,10 @@ static int enable_links(struct viper_device *dev,
 					sizeof(struct media_link_desc));
 
 		ret = ioctl(dev->media_fd, MEDIA_IOC_ENUM_LINKS, &links);
-		if (ret)
+		if (ret) {
+			viper_log("enum link failed - %d\n", errno);
 			goto links_done;
+		}
 
 		for (i = 0; i < from->links; i++) {
 			if (links.links[i].sink.entity == to->media_id) {
