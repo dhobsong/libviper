@@ -552,6 +552,16 @@ void shvio_start_bundle(SHVIO *vio, int bundle_lines)
 		if(start_io_device(pipe->output_fds[0], false))
 			return;
 
+		pipe->input_size[0][0] =
+			vio->rpf_set.bpitch0 * bundle_lines;
+		pipe->input_size[0][1] =
+			vio->rpf_set.bpitch1 * bundle_lines / 2;
+
+		pipe->output_size[0][0] =
+			vio->wpf_set.bpitch0 * wpf_lines;
+		pipe->output_size[0][1] =
+			vio->wpf_set.bpitch1 * wpf_lines / 2;
+
 		vio->output_y_offset = vio->wpf_set.bpitch0 * wpf_lines;
 		vio->output_c_offset = vio->wpf_set.bpitch1 * wpf_lines;
 	}
