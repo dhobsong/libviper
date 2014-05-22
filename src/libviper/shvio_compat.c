@@ -606,6 +606,7 @@ int shvio_wait(SHVIO *vio)
 		}
 
 		free_pipeline(vio->device, pipe);
+		vio->pipeline = NULL;
 	} else {
 		for (i = 0; i < pipe->num_inputs; i++)
 			dequeue_buffer(pipe->input_fds[i], true);
