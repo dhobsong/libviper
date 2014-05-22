@@ -308,8 +308,8 @@ int shvio_setup(SHVIO *vio,
 		size_y(dst_surface->format, dst_surface->pitch, 0);
 
 	if (output_planes > 1) {
-		pipeline->input_addr[0][1] = dst_surface->pc;
-		pipeline->input_size[0][1] = dst_surface->h *
+		pipeline->output_addr[0][1] = dst_surface->pc;
+		pipeline->output_size[0][1] = dst_surface->h *
 			size_c(dst_surface->format, dst_surface->pitch, 0);
 	}
 	vio->bundle_lines_remaining = src_surface->h;
