@@ -297,6 +297,39 @@ int init_context () {
 	pthread_mutex_unlock(&viper.lock);
 	return 0;
 }
+
+int deinit_context() {
+	struct viper_entity *entity;
+	struct viper_device *device;
+	void *tmp;
+	pthread_mutex_lock(&viper.lock);
+	if (--viper.ref_cnt) {
+		pthread_mutex_unlock(&viper.lock);
+		return 0;
+	}
+
+	device = viper.device_list;
+	while (device) {
+		entity = device->entity_list;
+		while (entity) {
+			if (entity->io_entity)
+				close(entity->io_entity->fd);
+			if (entity->name)
+				free(entity->name);
+			close(entity->fd);
+			tmp = entity;
+			entity = entity->next;
+			free(tmp);
+		}
+		close(device->media_fd);
+		tmp = device;
+		device = device->next;
+		free(tmp);
+	}
+	viper.device_list = NULL;
+	pthread_mutex_unlock(&viper.lock);
+	return 0;
+}
 /*  ----------------------------------------------- */
 
 static void entity_unlock(struct viper_entity *entity) {
